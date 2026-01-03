@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from orchestrator.orchestrator import run_all_agents,run_final_verdict, run_confidence_scores_observer
@@ -13,11 +13,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+router = APIRouter()
+
 app = FastAPI(
     title="Courtney AI Backend",
     description="Backend API for Courtney AI application",
     version="1.0.0"
 )
+
 
 # CORS middleware
 app.add_middleware(
@@ -35,8 +38,8 @@ class DiscussionRequest(BaseModel):
     round_no: int
     user_boost: list # List of user boost [0,1] for each agent
 
-@app.get("/", include_in_schema=False)
-def read_root():
+@router.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+async def read_root():
     return {"Message": "This is a private API",
             "Routes":   """
                         /health - Health Check
@@ -45,6 +48,8 @@ def read_root():
                         /verdict/user_wallet_address- Final decision Endpoint
                         """
             }
+
+app.include_router(router)
 
 @app.get("/health")
 def read_health():
