@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from orchestrator.orchestrator import run_all_agents,run_final_verdict, run_confidence_scores_observer
-from redisdb.redis_client import redis_client
+from redisdb.redis_client import redis_client,ping_redis
 import time, json
 import logging
 
@@ -25,10 +25,11 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Specific origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 class BasePromptRequest(BaseModel):
@@ -53,7 +54,16 @@ app.include_router(router)
 
 @app.get("/health")
 def read_health():
-    return {"status": "ok"}
+    redis_status = "connected"
+    try:
+        redis_client.ping()
+    except Exception as e:
+        redis_status = f"disconnected: {str(e)}"
+    
+    return {
+        "status": "ok",
+        "redis": redis_status
+    }
 
 
 @app.post("/base-prompt/{wallet_address}")
@@ -117,12 +127,12 @@ Base prompt:
 {session['base_prompt']}
 
 Previous responses:
-{session['agents']}
+{json.dumps(session['agents'], indent=2)}
 
 Caution : Your confidence score affects your credibility in the final verdict.
 """
 
-    responses, vector_store = await run_all_agents(discussion_prompt, session['vector_store'], body.round_no)
+    responses, vector_store = await run_all_agents(discussion_prompt, session['vector_store_name'], body.round_no)
 
     # Extract confidence scores from each agent's response
     recent_confidence_scores = [
@@ -132,7 +142,10 @@ Caution : Your confidence score affects your credibility in the final verdict.
     ]
 
     #confidence penalty calculation by orchestrator
-    confidence_penalty = await run_confidence_scores_observer(recent_confidence_scores, session["confidence_scores"][body.round_no - 2])
+    confidence_penalty = await run_confidence_scores_observer(
+        recent_confidence_scores, 
+        session["confidence_scores"][body.round_no - 2]
+    )
 
     session["round"] = body.round_no
     session["agents"] = responses
@@ -173,28 +186,44 @@ async def verdict(wallet_address: str):
     session = json.loads(data)
 
     if session["sealed"]:
-        return {"verdict": "Already finalized"}
+        # Return cached verdict and delete session
+        verdict_result = session.get("final_verdict")
+        await redis_client.delete(key)
+        logger.info(f"✓ Redis session cleared for wallet: {wallet_address}")
+        
+        return {
+            "wallet": wallet_address,
+            "verdict": verdict_result,  # Make sure this has the expected structure
+            "sealed": True
+        }
 
     final_verdict_prompt = f"""
 Base prompt:
 {session['base_prompt']}
 
 Final agent responses:
-{session['agents']}
+{json.dumps(session['agents'], indent=2)}
 
 Produce final verdict.
 """
 
-    verdict = await run_final_verdict(final_verdict_prompt, session["confidence_scores"], session["confidence_penalties"], session["user_boost"])
+    verdict_result = await run_final_verdict(
+        final_verdict_prompt, 
+        session["confidence_scores"], 
+        session["confidence_penalties"], 
+        session["user_boost"]
+    )
 
-    session["sealed"] = True
-    session["final_verdict"] = verdict
-
-    await redis_client.set(key, json.dumps(session), ex=86400)
+    logger.info(f"✓ Verdict generated for wallet: {wallet_address}")
+    logger.info(f"Verdict structure: {verdict_result}")  # Debug log
+    
+    # Delete the Redis session immediately after generating verdict
+    await redis_client.delete(key)
+    logger.info(f"✓ Redis session cleared for wallet: {wallet_address}")
 
     return {
         "wallet": wallet_address,
-        "verdict": verdict,
+        "verdict": verdict_result,
         "sealed": True
     }
 
@@ -206,11 +235,34 @@ async def startup_event():
     logger.info("Advanced Backend - All services in one place")
     logger.info(f"AI Models: Gemini, Grok, GPT")
     logger.info("=" * 60)
+    
+    # Test Redis connection
+    try:
+        logger.info("Testing Redis connection...")
+        is_connected = await ping_redis()
+        if is_connected:
+            logger.info("✓ Redis connected successfully")
+            # Test set/get
+            await redis_client.set("test_key", "test_value", ex=10)
+            result = await redis_client.get("test_key")
+            logger.info(f"✓ Redis test successful: {result}")
+            await redis_client.delete("test_key")
+        else:
+            logger.warning("✗ Redis connection failed - Application will continue but sessions won't persist")
+    except Exception as e:
+        logger.error(f"✗ Redis connection error: {type(e).__name__}: {e}")
+        logger.warning("Application will continue but Redis features will be unavailable")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Shutting down API...")
-    logger.info("All caches and sessions cleared. Goodbye!")
+    try:
+        await redis_client.close()
+        logger.info("Redis connection closed")
+    except Exception as e:
+        logger.warning(f"Error closing Redis connection: {e}")
+    logger.info("Shutdown complete. Goodbye!")
+
 
 if __name__ == "__main__":
     import uvicorn

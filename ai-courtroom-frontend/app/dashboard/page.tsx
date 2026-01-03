@@ -1,140 +1,232 @@
-import { Scale, Users, Wallet, Play, Info } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { AgentCard } from "@/components/agent-card"
+"use client";
+import { useState } from "react";
+import { Play, AlertCircle, Brain, Zap, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useWallet } from "@/components/wallet_connect";
+import { api } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+const agents = [
+  {
+    name: "GPT",
+    model: "GPT-4o",
+    avatar: "/gpt-avatar.png",
+    description: "Advanced reasoning and analysis",
+    properties: ["Multi-modal", "128K context", "Function calling"],
+    color: "text-green-500",
+  },
+  {
+    name: "Grok",
+    model: "Grok-2",
+    avatar: "/grok-avatar.png",
+    description: "Real-time data integration",
+    properties: ["X integration", "Real-time aware", "Humor-enhanced"],
+    color: "text-blue-500",
+  },
+  {
+    name: "Gemini",
+    model: "Gemini 2.0",
+    avatar: "/gemini-avatar.png",
+    description: "Multimodal understanding",
+    properties: ["Native multimodal", "2M context", "Code execution"],
+    color: "text-purple-500",
+  },
+];
 
 export default function DashboardPage() {
-  return (
-    <div className="flex min-h-screen flex-col bg-background">
-      {/* Top Bar */}
-      <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur">
-        <div className="container flex h-14 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Scale className="h-5 w-5 text-primary" />
-            <span className="font-bold">COURTROOM DASHBOARD</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 border border-border">
-              <Wallet className="h-4 w-4 text-primary" />
-              <span className="text-xs font-medium">0.42 ETH</span>
-            </div>
-            <Button size="sm" className="h-8">
-              Settings
-            </Button>
-          </div>
-        </div>
-      </header>
+  const { address } = useWallet();
+  const router = useRouter();
+  const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-      <main className="container py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Input & Config */}
-        <div className="lg:col-span-7 space-y-8">
-          <section className="space-y-4">
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-bold tracking-tight">The Case</h2>
-              <Badge variant="secondary" className="font-mono">
-                PROMPT-01
-              </Badge>
-            </div>
-            <Card className="border-primary/20 shadow-lg shadow-primary/5">
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Main Argument / Prompt</label>
-                  <Textarea
-                    placeholder="Enter the scenario or decision that needs deliberation..."
-                    className="min-h-[200px] bg-muted/30 border-border/50 focus:border-primary/50 transition-all resize-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Context Type</label>
-                    <Input placeholder="e.g. Legal, Technical, Ethics" className="bg-muted/30" />
+  const handleCommenceTrial = async () => {
+    if (!address) {
+      setError("Wallet not connected");
+      return;
+    }
+
+    if (!prompt.trim()) {
+      setError("Please enter a prompt");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      // Clear any previous session data
+      localStorage.removeItem("currentSession");
+      localStorage.removeItem("verdictData");
+      console.log("✓ Previous session data cleared");
+
+      console.log("Sending base prompt with wallet:", address);
+      const response = await api.basePrompt(address, prompt);
+      console.log("Response received:", response);
+
+      // Store new session in localStorage
+      localStorage.setItem("currentSession", JSON.stringify(response));
+
+      router.push("/dashboard/deliberation");
+    } catch (err: any) {
+      console.error("Error:", err);
+      setError(err.message || "Failed to start session");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="container py-8 max-w-7xl mx-auto">
+      <div className="mb-8 space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">Courtney AI</h1>
+        <p className="text-muted-foreground">
+          Orchestrate a council of AI agents for deliberation and verdict
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Agent Cards */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold">The Council</h2>
+          {agents.map((agent) => (
+            <Card
+              key={agent.name}
+              className="border-border/50 hover:border-primary/50 transition-all"
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12 border-2 border-border">
+                    <AvatarImage src={agent.avatar} />
+                    <AvatarFallback className={agent.color}>
+                      {agent.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{agent.name}</CardTitle>
+                    <Badge variant="outline" className="text-xs mt-1">
+                      {agent.model}
+                    </Badge>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Complexity Level</label>
-                    <div className="pt-2">
-                      <Slider defaultValue={[50]} max={100} step={1} />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  {agent.description}
+                </p>
+                <div className="space-y-1">
+                  {agent.properties.map((prop, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <div
+                        className={`h-1.5 w-1.5 rounded-full ${agent.color.replace(
+                          "text-",
+                          "bg-"
+                        )}`}
+                      />
+                      {prop}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Right Column: Prompt Area */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="border-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Present Your Case</CardTitle>
+                <Badge variant="secondary" className="font-mono">
+                  NEW SESSION
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Main Argument / Prompt
+                </label>
+                <Textarea
+                  placeholder="Enter the scenario, question, or decision that needs deliberation...
+
+Example: 'Should our company adopt a 4-day work week? Consider productivity, employee satisfaction, and competitive advantage.'"
+                  className="min-h-[300px] bg-muted/30 border-border/50 focus:border-primary/50 transition-all resize-none"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  disabled={loading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The more detailed your prompt, the better the deliberation
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Card */}
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="flex-1 space-y-2">
+                  <h3 className="font-bold text-lg">Ready to Begin?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    The council will analyze your prompt and provide diverse
+                    perspectives
+                  </p>
+                  <div className="flex gap-4 text-xs text-muted-foreground pt-2">
+                    <div className="flex items-center gap-1">
+                      <Brain className="h-3 w-3" />
+                      <span>3 AI Agents</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Zap className="h-3 w-3" />
+                      <span>Parallel Analysis</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Target className="h-3 w-3" />
+                      <span>Confidence Scores</span>
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </section>
-
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold tracking-tight">Session Budget</h2>
-              <div className="flex items-center gap-2 text-primary font-mono font-bold">
-                $1.20 <span className="text-xs text-muted-foreground font-normal">Est. Cost</span>
-              </div>
-            </div>
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="p-6 flex items-center justify-between gap-6">
-                <div className="flex-1 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Maximum Spend Limit</span>
-                    <span className="font-bold">$5.00</span>
-                  </div>
-                  <Slider defaultValue={[20]} max={100} step={5} className="py-2" />
-                </div>
-                <Button size="lg" className="h-14 px-8 bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20">
-                  <Play className="mr-2 h-5 w-5 fill-current" /> Commence Trial
+                <Button
+                  size="lg"
+                  className="h-14 px-8 bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 w-full md:w-auto"
+                  onClick={handleCommenceTrial}
+                  disabled={loading || !prompt.trim()}
+                >
+                  {loading ? (
+                    <>
+                      <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Initializing...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-5 w-5 fill-current" />
+                      Commence Trial
+                    </>
+                  )}
                 </Button>
-              </CardContent>
-            </Card>
-          </section>
-        </div>
-
-        {/* Right Column: Agents */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold tracking-tight">The Legal Council</h2>
-            <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/10">
-              <Users className="mr-2 h-4 w-4" /> Add Agent
-            </Button>
-          </div>
-
-          <div className="grid gap-4">
-            <AgentCard
-              name="Counselor GPT"
-              role="Lead Defense"
-              model="GPT-4o"
-              status="active"
-              weight={75}
-              avatar="/ai-avatar-1.jpg"
-            />
-            <AgentCard
-              name="Claude-Juris"
-              role="Prosecutor"
-              model="Claude 3.5 Sonnet"
-              status="active"
-              weight={60}
-              avatar="/ai-avatar-2.jpg"
-            />
-            <AgentCard
-              name="Llama-Lex"
-              role="Neutral Observer"
-              model="Llama 3.1 405B"
-              status="idle"
-              weight={40}
-              avatar="/ai-avatar-3.jpg"
-            />
-          </div>
-
-          <Card className="border-dashed bg-transparent border-muted-foreground/30">
-            <CardContent className="p-6 text-center text-muted-foreground space-y-2">
-              <Info className="h-5 w-5 mx-auto opacity-50" />
-              <p className="text-sm">
-                Each agent contributes to the final deliberation. Weighting adjusts their influence on the Judge's
-                verdict.
-              </p>
+              </div>
             </CardContent>
           </Card>
         </div>
-      </main>
-    </div>
-  )
+      </div>
+    </main>
+  );
 }

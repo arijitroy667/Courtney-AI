@@ -6,7 +6,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 import uuid
 from math import exp,sqrt
 
@@ -57,9 +57,21 @@ async def run_all_agents(prompt: str, collection_name, round_no: int):
     )
 
     responses = {
-        "gpt": gpt,
-        "grok": grok,
-        "gemini": gemini
+        "gpt": {
+            "content": gpt.content,
+            "confidence_score": gpt.confidence_score,
+            "reason": gpt.Reason
+        },
+        "grok": {
+            "content": grok.content,
+            "confidence_score": grok.confidence_score,
+            "reason": grok.Reason
+        },
+        "gemini": {
+            "content": gemini.content,
+            "confidence_score": gemini.confidence_score,
+            "reason": gemini.Reason
+        }
     }
 
     # Store this round in ChromaDB
@@ -133,5 +145,15 @@ async def run_final_verdict(prompt: str, confidence_scores: list, confidence_pen
         final_response = await run_gemini(final_verdict_prompt)
     
 
-    return {final_response}
+    return {
+        "content": final_response.content,
+        "confidence_score": final_response.confidence_score,
+        "reason": final_response.Reason,
+        "winner": winner_identity,
+        "scores": {
+            "gpt": agent_scores[0],
+            "grok": agent_scores[1],
+            "gemini": agent_scores[2]
+        }
+    }
 

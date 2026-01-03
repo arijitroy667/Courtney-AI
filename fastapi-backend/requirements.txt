@@ -1,11 +1,12 @@
-redis
+redis[hiredis]
 asyncio-redis
 python-dotenv
 fastapi
-uvicorn
+uvicorn[standard]
 langchain
 langchain-core
 langchain-community
+langchain-chroma
 langchain-text-splitters
 langchain-google-genai
 google-generativeai
