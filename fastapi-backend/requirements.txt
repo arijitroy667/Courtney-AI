@@ -1,0 +1,11 @@
+redis
+asyncio-redis
+python-dotenv
+fastapi
+openai
+uvicorn
+langchain
+langchain-core
+langchain-google-genai
+google-generativeai
+chromadb
