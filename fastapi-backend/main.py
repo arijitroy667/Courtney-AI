@@ -35,7 +35,7 @@ class DiscussionRequest(BaseModel):
     round_no: int
     user_boost: list # List of user boost [0,1] for each agent
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def read_root():
     return {"Message": "This is a private API",
             "Routes":   """
