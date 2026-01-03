@@ -2,10 +2,10 @@ redis
 asyncio-redis
 python-dotenv
 fastapi
-openai
 uvicorn
 langchain
 langchain-core
+langchain-text-splitters
 langchain-google-genai
 google-generativeai
 chromadb

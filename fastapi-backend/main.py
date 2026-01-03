@@ -199,7 +199,7 @@ async def startup_event():
     logger.info("=" * 60)
     logger.info("Courtney AI Analysis API v1.0 Starting...")
     logger.info("Advanced Backend - All services in one place")
-    logger.info(f"AI Model: Gemini, Grok, GPT")
+    logger.info(f"AI Models: Gemini, Grok, GPT")
     logger.info("=" * 60)
 
 @app.on_event("shutdown")
