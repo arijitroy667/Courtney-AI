@@ -1,25 +1,27 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-
+/* @tailwind base;
+@tailwind components; */
+@tailwind utilities;
 @custom-variant dark (&:is(.dark *));
 
 :root {
   --background: oklch(0.9789 0.0082 121.6272);
   --foreground: oklch(0 0 0);
-  --card: oklch(1.0 0 0);
+  --card: oklch(1 0 0);
   --card-foreground: oklch(0 0 0);
-  --popover: oklch(1.0 0 0);
+  --popover: oklch(1 0 0);
   --popover-foreground: oklch(0 0 0);
   --primary: oklch(0.5106 0.2301 276.9656);
-  --primary-foreground: oklch(1.0 0 0);
+  --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.7038 0.123 182.5025);
-  --secondary-foreground: oklch(1.0 0 0);
+  --secondary-foreground: oklch(1 0 0);
   --muted: oklch(0.9551 0 0);
   --muted-foreground: oklch(0.3211 0 0);
   --accent: oklch(0.7686 0.1647 70.0804);
   --accent-foreground: oklch(0 0 0);
   --destructive: oklch(0.6368 0.2078 25.3313);
-  --destructive-foreground: oklch(1.0 0 0);
+  --destructive-foreground: oklch(1 0 0);
   --border: oklch(0 0 0);
   --input: oklch(0.5555 0 0);
   --ring: oklch(0.7853 0.1041 274.7134);
@@ -32,7 +34,7 @@
   --sidebar: oklch(0.9789 0.0082 121.6272);
   --sidebar-foreground: oklch(0 0 0);
   --sidebar-primary: oklch(0.5106 0.2301 276.9656);
-  --sidebar-primary-foreground: oklch(1.0 0 0);
+  --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.7686 0.1647 70.0804);
   --sidebar-accent-foreground: oklch(0 0 0);
   --sidebar-border: oklch(0 0 0);
@@ -47,13 +49,13 @@
 
 .dark {
   --background: oklch(0.08 0 0);
-  --foreground: oklch(1.0 0 0);
+  --foreground: oklch(1 0 0);
   --card: oklch(0.15 0.02 276);
-  --card-foreground: oklch(1.0 0 0);
+  --card-foreground: oklch(1 0 0);
   --popover: oklch(0.12 0.02 276);
-  --popover-foreground: oklch(1.0 0 0);
+  --popover-foreground: oklch(1 0 0);
   --primary: oklch(0.65 0.2 280);
-  --primary-foreground: oklch(1.0 0 0);
+  --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.7845 0.1325 181.912);
   --secondary-foreground: oklch(0 0 0);
   --muted: oklch(0.25 0.01 276);
@@ -71,9 +73,9 @@
   --chart-4: oklch(0.7253 0.1752 349.7607);
   --chart-5: oklch(0.8003 0.1821 151.711);
   --sidebar: oklch(0.1 0.01 276);
-  --sidebar-foreground: oklch(1.0 0 0);
+  --sidebar-foreground: oklch(1 0 0);
   --sidebar-primary: oklch(0.65 0.2 280);
-  --sidebar-primary-foreground: oklch(1.0 0 0);
+  --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.75 0.15 85);
   --sidebar-accent-foreground: oklch(0.08 0 0);
   --sidebar-border: oklch(0.25 0.02 276);
@@ -128,23 +130,54 @@
   --font-serif: "Source Serif 4", "Source Serif 4 Fallback";
   /* computed shadow variables below - do not modify */
   --shadow-2xs: var(--shadow-x) var(--shadow-y)
-    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
-  --shadow-xs: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread)
-    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
-  --shadow-sm: var(--shadow-x) var(--shadow-y) calc(var(--shadow-blur) * 1.5) var(--shadow-spread)
-    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
-  --shadow-md: calc(var(--shadow-x) * 2) calc(var(--shadow-y) * 2) calc(var(--shadow-blur) * 3)
-    calc(var(--shadow-spread) - 1px)
-    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
-  --shadow-lg: calc(var(--shadow-x) * 4) calc(var(--shadow-y) * 4) calc(var(--shadow-blur) * 5)
-    calc(var(--shadow-spread) - 3px)
-    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
-  --shadow-xl: calc(var(--shadow-x) * 6) calc(var(--shadow-y) * 6) calc(var(--shadow-blur) * 7)
-    calc(var(--shadow-spread) - 5px)
-    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
-  --shadow-2xl: calc(var(--shadow-x) * 8) calc(var(--shadow-y) * 8) calc(max(0px, var(--shadow-blur) * 9 - 8px))
+    color-mix(
+      in srgb,
+      var(--shadow-color) calc(var(--shadow-opacity) * 100%),
+      transparent
+    );
+  --shadow-xs: var(--shadow-x) var(--shadow-y) var(--shadow-blur)
+    var(--shadow-spread)
+    color-mix(
+      in srgb,
+      var(--shadow-color) calc(var(--shadow-opacity) * 100%),
+      transparent
+    );
+  --shadow-sm: var(--shadow-x) var(--shadow-y) calc(var(--shadow-blur) * 1.5)
+    var(--shadow-spread)
+    color-mix(
+      in srgb,
+      var(--shadow-color) calc(var(--shadow-opacity) * 100%),
+      transparent
+    );
+  --shadow-md: calc(var(--shadow-x) * 2) calc(var(--shadow-y) * 2)
+    calc(var(--shadow-blur) * 3) calc(var(--shadow-spread) - 1px)
+    color-mix(
+      in srgb,
+      var(--shadow-color) calc(var(--shadow-opacity) * 100%),
+      transparent
+    );
+  --shadow-lg: calc(var(--shadow-x) * 4) calc(var(--shadow-y) * 4)
+    calc(var(--shadow-blur) * 5) calc(var(--shadow-spread) - 3px)
+    color-mix(
+      in srgb,
+      var(--shadow-color) calc(var(--shadow-opacity) * 100%),
+      transparent
+    );
+  --shadow-xl: calc(var(--shadow-x) * 6) calc(var(--shadow-y) * 6)
+    calc(var(--shadow-blur) * 7) calc(var(--shadow-spread) - 5px)
+    color-mix(
+      in srgb,
+      var(--shadow-color) calc(var(--shadow-opacity) * 100%),
+      transparent
+    );
+  --shadow-2xl: calc(var(--shadow-x) * 8) calc(var(--shadow-y) * 8)
+    calc(max(0px, var(--shadow-blur) * 9 - 8px))
     calc(var(--shadow-spread) - 12px)
-    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 250%), transparent);
+    color-mix(
+      in srgb,
+      var(--shadow-color) calc(var(--shadow-opacity) * 250%),
+      transparent
+    );
   --shadow: var(--shadow-md);
   --color-shadow-color: var(--shadow-color);
   --shadow-opacity: var(--shadow-opacity);
@@ -181,4 +214,89 @@
 
 .animate-gavel {
   animation: gavel-slam 0.6s ease-out;
+}
+
+/* Custom animations for background motion */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-25px) translateX(10px);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-15px) translateX(-8px);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translateY(-35px) translateX(5px);
+    opacity: 0.6;
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-30px) translateX(20px) scale(1.1);
+  }
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(104, 42, 216, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(104, 42, 216, 0.6);
+  }
+}
+
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 6s ease-in-out infinite;
+}
+
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 3s ease-in-out infinite;
 }

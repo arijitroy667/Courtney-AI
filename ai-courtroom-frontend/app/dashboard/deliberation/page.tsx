@@ -12,6 +12,7 @@ import {
   Download,
   FileText,
   FileDown,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ScrollArea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { useWallet } from "@/components/wallet_connect";
 import { api, AgentResponse } from "@/lib/api";
