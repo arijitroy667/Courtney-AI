@@ -2,7 +2,10 @@ from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from orchestrator.orchestrator import run_all_agents,run_final_verdict, run_confidence_scores_observer
-from redisdb.redis_client import redis_client,ping_redis
+from sqlitedb.sqlite_client import (
+    init_db, create_session, get_session, update_session, 
+    delete_session, session_exists, cleanup_old_sessions
+)
 import time, json
 import logging
 
@@ -25,7 +28,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Specific origins
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://127.0.0.1:4021"],  # Specific origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,16 +56,10 @@ async def read_root():
 app.include_router(router)
 
 @app.get("/health")
-def read_health():
-    redis_status = "connected"
-    try:
-        redis_client.ping()
-    except Exception as e:
-        redis_status = f"disconnected: {str(e)}"
-    
+async def read_health():
     return {
         "status": "ok",
-        "redis": redis_status
+        "database": "sqlite"
     }
 
 
@@ -70,7 +67,7 @@ def read_health():
 async def base_prompt(wallet_address: str, body: BasePromptRequest):
     key = f"session:{wallet_address}"
 
-    if await redis_client.exists(key):
+    if await session_exists(wallet_address):
         raise HTTPException(status_code=400, detail="Session already exists")
 
     responses, vector_store = await run_all_agents(body.prompt, None, 1)
@@ -95,11 +92,7 @@ async def base_prompt(wallet_address: str, body: BasePromptRequest):
         "created_at": int(time.time())
     }
 
-    await redis_client.set(
-        key,
-        json.dumps(session),
-        ex=86400  # 1 day TTL
-    )
+    await create_session(wallet_address, session)
 
     return {
         "round": 1,
@@ -109,13 +102,10 @@ async def base_prompt(wallet_address: str, body: BasePromptRequest):
 
 @app.post("/discuss/{wallet_address}")
 async def discuss(wallet_address: str, body: DiscussionRequest):
-    key = f"session:{wallet_address}"
-    data = await redis_client.get(key)
+    session = await get_session(wallet_address)
 
-    if not data:
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-
-    session = json.loads(data)
 
     if session["sealed"]:
         raise HTTPException(status_code=403, detail="Session sealed")
@@ -167,7 +157,7 @@ Caution : Your confidence score affects your credibility in the final verdict.
         session["confidence_scores"] = []
     session["confidence_scores"].append(recent_confidence_scores)
 
-    await redis_client.set(key, json.dumps(session), ex=86400)
+    await update_session(wallet_address, session)
 
     return {
         "round": body.round_no,
@@ -177,23 +167,19 @@ Caution : Your confidence score affects your credibility in the final verdict.
 
 @app.post("/verdict/{wallet_address}")
 async def verdict(wallet_address: str):
-    key = f"session:{wallet_address}"
-    data = await redis_client.get(key)
+    session = await get_session(wallet_address)
 
-    if not data:
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    session = json.loads(data)
-
     if session["sealed"]:
-        # Return cached verdict and delete session
         verdict_result = session.get("final_verdict")
-        await redis_client.delete(key)
-        logger.info(f"✓ Redis session cleared for wallet: {wallet_address}")
+        await delete_session(wallet_address)
+        logger.info(f"✓ Session cleared for wallet: {wallet_address}")
         
         return {
             "wallet": wallet_address,
-            "verdict": verdict_result,  # Make sure this has the expected structure
+            "verdict": verdict_result,
             "sealed": True
         }
 
@@ -217,8 +203,8 @@ Produce final verdict.
     logger.info(f"✓ Verdict generated for wallet: {wallet_address}")
     logger.info(f"Verdict structure: {verdict_result}")  # Debug log
     
-    # Delete the Redis session immediately after generating verdict
-    await redis_client.delete(key)
+    # Delete the session immediately after generating verdict
+    await delete_session(wallet_address)
     logger.info(f"✓ Redis session cleared for wallet: {wallet_address}")
 
     return {
@@ -227,6 +213,10 @@ Produce final verdict.
         "sealed": True
     }
 
+@app.delete("/session/{wallet_address}")
+async def delete_session_endpoint(wallet_address: str):
+    await delete_session(wallet_address)
+    return {"success": True}
 
 @app.on_event("startup")
 async def startup_event():
@@ -234,35 +224,19 @@ async def startup_event():
     logger.info("Courtney AI Analysis API v1.0 Starting...")
     logger.info("Advanced Backend - All services in one place")
     logger.info(f"AI Models: Gemini, Grok, GPT")
+    logger.info("Database: SQLite")
     logger.info("=" * 60)
     
-    # Test Redis connection
     try:
-        logger.info("Testing Redis connection...")
-        is_connected = await ping_redis()
-        if is_connected:
-            logger.info("✓ Redis connected successfully")
-            # Test set/get
-            await redis_client.set("test_key", "test_value", ex=10)
-            result = await redis_client.get("test_key")
-            logger.info(f"✓ Redis test successful: {result}")
-            await redis_client.delete("test_key")
-        else:
-            logger.warning("✗ Redis connection failed - Application will continue but sessions won't persist")
+        await init_db()
+        await cleanup_old_sessions()
     except Exception as e:
-        logger.error(f"✗ Redis connection error: {type(e).__name__}: {e}")
-        logger.warning("Application will continue but Redis features will be unavailable")
+        logger.error(f"✗ Database initialization error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Shutting down API...")
-    try:
-        await redis_client.close()
-        logger.info("Redis connection closed")
-    except Exception as e:
-        logger.warning(f"Error closing Redis connection: {e}")
     logger.info("Shutdown complete. Goodbye!")
-
 
 if __name__ == "__main__":
     import uvicorn

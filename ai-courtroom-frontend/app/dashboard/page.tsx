@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Play, AlertCircle, Brain, Zap, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useWallet } from "@/components/wallet_connect";
 import { api } from "@/lib/api";
+import {
+  initializeX402Client,
+  isX402Initialized,
+  resetX402Client,
+} from "@/components/x402-buyer";
 import { useRouter } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -44,6 +49,45 @@ export default function DashboardPage() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [x402Ready, setX402Ready] = useState(false);
+  const [x402Initializing, setX402Initializing] = useState(false);
+
+  // Reset x402 client when wallet changes
+  useEffect(() => {
+    if (!address) {
+      resetX402Client();
+      setX402Ready(false);
+    }
+  }, [address]);
+
+  // Initialize x402 client when wallet connects
+  useEffect(() => {
+    const initX402 = async () => {
+      if (!address) return;
+      
+      if (isX402Initialized()) {
+        setX402Ready(true);
+        return;
+      }
+
+      setX402Initializing(true);
+      setError("");
+
+      try {
+        await initializeX402Client(address);
+        setX402Ready(true);
+        console.log("✓ x402 client initialized for:", address);
+      } catch (err: any) {
+        console.error("Failed to initialize x402 client:", err);
+        setError("Failed to initialize payment system: " + err.message);
+        setX402Ready(false);
+      } finally {
+        setX402Initializing(false);
+      }
+    };
+
+    initX402();
+  }, [address]);
 
   const handleCommenceTrial = async () => {
     if (!address) {
@@ -56,25 +100,39 @@ export default function DashboardPage() {
       return;
     }
 
+    if (!x402Ready) {
+      setError("Payment system not ready. Please wait or refresh the page.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      // Clear any previous session data
+      // Clear any previous session
       localStorage.removeItem("currentSession");
       localStorage.removeItem("verdictData");
-      console.log("✓ Previous session data cleared");
 
-      console.log("Sending base prompt with wallet:", address);
+      // Try to delete any existing session on the backend
+      try {
+        await api.deleteSession(address);
+        console.log("✓ Previous backend session cleared");
+      } catch (e) {
+        // Ignore - session may not exist
+      }
+
+      console.log("💳 Sending base prompt with wallet:", address);
+      console.log("   MetaMask should prompt for payment approval...");
+      
       const response = await api.basePrompt(address, prompt);
-      console.log("Response received:", response);
+      console.log("✅ Response received:", response);
 
       // Store new session in localStorage
       localStorage.setItem("currentSession", JSON.stringify(response));
 
       router.push("/dashboard/deliberation");
     } catch (err: any) {
-      console.error("Error:", err);
+      console.error("❌ Error:", err);
       setError(err.message || "Failed to start session");
     } finally {
       setLoading(false);
@@ -146,9 +204,21 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Present Your Case</CardTitle>
-                <Badge variant="secondary" className="font-mono">
-                  NEW SESSION
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {x402Initializing && (
+                    <Badge variant="secondary" className="animate-pulse">
+                      Initializing Payment...
+                    </Badge>
+                  )}
+                  {x402Ready && (
+                    <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                      Payment Ready
+                    </Badge>
+                  )}
+                  <Badge variant="secondary" className="font-mono">
+                    NEW SESSION
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -187,7 +257,7 @@ Example: 'Should our company adopt a 4-day work week? Consider productivity, emp
                   <h3 className="font-bold text-lg">Ready to Begin?</h3>
                   <p className="text-sm text-muted-foreground">
                     The council will analyze your prompt and provide diverse
-                    perspectives
+                    perspectives. <strong>Cost: 1 USDC</strong>
                   </p>
                   <div className="flex gap-4 text-xs text-muted-foreground pt-2">
                     <div className="flex items-center gap-1">
@@ -208,9 +278,14 @@ Example: 'Should our company adopt a 4-day work week? Consider productivity, emp
                   size="lg"
                   className="h-14 px-8 bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 w-full md:w-auto"
                   onClick={handleCommenceTrial}
-                  disabled={loading || !prompt.trim()}
+                  disabled={loading || !prompt.trim() || !x402Ready || x402Initializing}
                 >
                   {loading ? (
+                    <>
+                      <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Processing Payment...
+                    </>
+                  ) : x402Initializing ? (
                     <>
                       <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                       Initializing...
@@ -218,7 +293,7 @@ Example: 'Should our company adopt a 4-day work week? Consider productivity, emp
                   ) : (
                     <>
                       <Play className="mr-2 h-5 w-5 fill-current" />
-                      Commence Trial
+                      Commence Trial (1 USDC)
                     </>
                   )}
                 </Button>

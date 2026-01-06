@@ -1,5 +1,4 @@
-redis[hiredis]
-asyncio-redis
+aiosqlite
 python-dotenv
 fastapi
 uvicorn[standard]

@@ -2,6 +2,7 @@ import asyncio
 import redis.asyncio as redis
 import os
 from dotenv import load_dotenv
+import socket
 
 load_dotenv()
 
@@ -14,6 +15,27 @@ async def test_connection():
     print(f"Port: {PORT}")
     print(f"Password: {'*' * len(PASSWORD) if PASSWORD else 'None'}")
     
+    # Test basic TCP connectivity first
+    print("\n=== Testing TCP Connectivity ===")
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        result = sock.connect_ex((HOST, PORT))
+        sock.close()
+        if result == 0:
+            print(f"✓ TCP connection successful to {HOST}:{PORT}")
+        else:
+            print(f"✗ TCP connection failed to {HOST}:{PORT} (error code: {result})")
+            print("  → Check if Redis service is running and accessible")
+            return
+    except socket.gaierror as e:
+        print(f"✗ DNS resolution failed: {e}")
+        print("  → Check if the hostname is correct")
+        return
+    except Exception as e:
+        print(f"✗ TCP test error: {type(e).__name__}: {e}")
+        return
+    
     # Test WITHOUT SSL first
     print("\n=== Testing WITHOUT SSL ===")
     client_no_ssl = redis.Redis(
@@ -22,8 +44,9 @@ async def test_connection():
         decode_responses=True,
         username="default",
         password=PASSWORD,
-        socket_timeout=10,
-        socket_connect_timeout=10
+        socket_timeout=5,
+        socket_connect_timeout=5,
+        retry_on_timeout=False
     )
     
     try:
@@ -53,8 +76,9 @@ async def test_connection():
         password=PASSWORD,
         ssl=True,
         ssl_cert_reqs=None,
-        socket_timeout=10,
-        socket_connect_timeout=10
+        socket_timeout=5,
+        socket_connect_timeout=5,
+        retry_on_timeout=False
     )
     
     try:
