@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/dashboard/history", label: "History", icon: History },
-  { href: "/dashboard/receipt", label: "Receipt", icon: FileText },
 ]
 
 export function Navigation() {

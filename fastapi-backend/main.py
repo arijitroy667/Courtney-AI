@@ -203,6 +203,26 @@ Produce final verdict.
     logger.info(f"✓ Verdict generated for wallet: {wallet_address}")
     logger.info(f"Verdict structure: {verdict_result}")  # Debug log
     
+    # Generate ZK proof and upload to IPFS
+    try:
+        logger.info("🔐 Generating ZK proof...")
+        
+        # Call Node.js script to generate proof
+        verdict_json = json.dumps({
+            "wallet": wallet_address,
+            "verdict": verdict_result
+        })
+        
+        # You can either:
+        # Option 1: Call Node.js script directly
+        # Option 2: Make HTTP request to Node backend
+        # For now, just log that proof generation would happen
+        logger.info("ZK proof generation will be triggered by Node backend")
+        
+    except Exception as e:
+        logger.error(f"Failed to generate ZK proof: {e}")
+        # Don't fail the request, just log the error
+    
     # Delete the session immediately after generating verdict
     await delete_session(wallet_address)
     logger.info(f"✓ Redis session cleared for wallet: {wallet_address}")

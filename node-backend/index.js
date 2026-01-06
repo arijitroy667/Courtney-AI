@@ -239,62 +239,43 @@ app.post("/api/discuss/:wallet_address", async (req, res) => {
 
 // Verdict Endpoint (FREE - no payment required)
 app.post("/api/verdict/:wallet_address", async (req, res) => {
+  const { wallet_address } = req.params;
+
   try {
-    const { wallet_address } = req.params;
+    // Call FastAPI to get verdict
+    const response = await fetch(`${FASTAPI_URL}/verdict/${wallet_address}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
 
-    const response = await axios.post(
-      `${FASTAPI_URL}/verdict/${wallet_address}`
-    );
-
-    const verdictData = response.data;
-
-    // 1. Write transcript to temp directory
-    const tempDir = path.join(__dirname, "../tmp");
-    await fs.mkdir(tempDir, { recursive: true });
-    const transcriptPath = path.join(
-      tempDir,
-      `transcript_${wallet_address}.bin`
-    );
-    await fs.writeFile(
-      transcriptPath,
-      Buffer.from(verdictData.transcript, "base64")
-    );
-
-    // 2. Generate zk proof and store on IPFS
-    const proofCid = await generateZkProofAndStore(transcriptPath);
-
-    // 3. Save to MongoDB
-    try {
-      let user = await User.findOne({ wallet_address });
-
-      if (!user) {
-        user = new User({
-          wallet_address,
-          courtney_reports: [],
-        });
-      }
-
-      user.courtney_reports.push({
-        content_cid: `ipfs://${proofCid}`,
-        payment_receipt: "verdict-no-charge",
-      });
-
-      await user.save();
-      console.log(`✓ Verdict saved to MongoDB for ${wallet_address}`);
-    } catch (dbError) {
-      console.error("MongoDB save error:", dbError);
+    if (!response.ok) {
+      throw new Error(`FastAPI error: ${response.statusText}`);
     }
 
-    res.json({
-      ...verdictData,
-      content_cid: `ipfs://${proofCid}`,
-    });
+    const verdictData = await response.json();
+
+    // Generate ZK proof and upload to IPFS
+    try {
+      console.log("🔐 Generating ZK proof for verdict...");
+      const proofResult = await generateZkProofAndStore(verdictData);
+      console.log(`✓ Proof uploaded to IPFS: ${proofResult.cid}`);
+
+      // Add proof data to response
+      verdictData.proof = {
+        cid: proofResult.cid,
+        url: `https://gateway.pinata.cloud/ipfs/${proofResult.cid}`,
+        verdict_hash: proofResult.verdict_hash,
+        method_id: proofResult.method_id,
+      };
+    } catch (proofError) {
+      console.error("Failed to generate ZK proof:", proofError);
+      verdictData.proof_error = proofError.message;
+    }
+
+    res.json(verdictData);
   } catch (error) {
-    console.error("Error in verdict:", error.response?.data || error.message);
-    res.status(500).json({
-      error: "Failed to generate verdict",
-      details: error.message,
-    });
+    console.error("Verdict error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
