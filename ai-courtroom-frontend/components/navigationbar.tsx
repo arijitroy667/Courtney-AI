@@ -1,5 +1,5 @@
 "use client"
-import { Scale, Home, History, FileText } from "lucide-react"
+import { Scale, Home, History, FileText, Dice1 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import ConnectWalletButton from "@/components/ConnectWalletButton"
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/dashboard/history", label: "History", icon: History },
+  { href: "/dashboard/rng", label: "RNG", icon: Dice1 },
 ]
 
 export function Navigation() {

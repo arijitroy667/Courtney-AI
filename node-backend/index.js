@@ -11,6 +11,7 @@ import {
   calculateBoostFee,
 } from "./functions/fee-calculation.js";
 import { generateZkProofAndStore } from "./utils/ipfs-proof-storage.js";
+import contractRoutes from "./contract/contract-routes.ts";
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use((req, res, next) => {
 // JSON parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(contractRoutes);
 
 // Health check (free)
 app.get("/health", (req, res) => {
