@@ -1,185 +1,168 @@
-import { x402Client, wrapFetchWithPayment, x402HTTPClient } from "@x402/fetch";
-import { registerExactEvmScheme } from "@x402/evm/exact/client";
-import type { Account } from "viem";
+"use client";
 
-// Declare MetaMask ethereum provider
+import { encodeFunctionData } from "viem";
+
 declare global {
   interface Window {
     ethereum?: any;
   }
 }
 
+// ERC20 ABI for transfer function
+const ERC20_ABI = [
+  {
+    name: "transfer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    name: "balanceOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "decimals",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+  },
+] as const;
+
 class PaymentClient {
-  private client: InstanceType<typeof x402Client> | null = null;
-  private fetchWithPayment: typeof fetch | null = null;
-  private httpClient: InstanceType<typeof x402HTTPClient> | null = null;
   private walletAddress: string | null = null;
   private paymentReceipts: Map<string, any> = new Map();
+  private initialized: boolean = false;
 
-  /**
-   * Check if X402 client is initialized and ready
-   */
   isReady(): boolean {
-    return this.client !== null && this.fetchWithPayment !== null;
+    return this.initialized && this.walletAddress !== null;
   }
 
-  /**
-   * Initialize X402 client with MetaMask wallet
-   */
   async initialize(): Promise<string> {
     if (!window.ethereum) {
       throw new Error("MetaMask is not installed");
     }
 
     try {
-      console.log("🔧 Initializing X402 payment client...");
+      console.log("🔧 Initializing payment client...");
 
       // Request account access
       const accounts = await window.ethereum.request({
         method: "eth_requestAccounts",
       });
 
-      const address = accounts[0];
-      if (!address) {
-        throw new Error("No account found. Please connect MetaMask.");
+      if (!accounts || accounts.length === 0) {
+        throw new Error("No accounts found");
       }
 
-      this.walletAddress = address;
-      console.log(`🔑 Wallet address: ${address}`);
+      this.walletAddress = accounts[0];
+      this.initialized = true;
 
-      // Create X402 client
-      this.client = new x402Client();
-
-      // Create MetaMask signer that matches viem Account interface
-      const metamaskSigner: Account = {
-        address: address as `0x${string}`,
-        type: "local" as const,
-        source: "custom" as const,
-
-        // Required by Account interface but not used
-        publicKey: "0x" as `0x${string}`,
-
-        // Sign message using MetaMask
-        async signMessage({ message }) {
-          console.log("📝 Signing message with MetaMask...");
-
-          const messageToSign =
-            typeof message === "string"
-              ? message
-              : "raw" in message
-              ? message.raw
-              : new TextDecoder().decode(message);
-
-          const signature = await window.ethereum.request({
-            method: "personal_sign",
-            params: [messageToSign, address],
+      // Check and switch to Base Sepolia if needed
+      const chainId = await window.ethereum.request({ method: "eth_chainId" });
+      if (chainId !== "0x14a34") {
+        // 84532 in hex
+        console.log("🔄 Switching to Base Sepolia...");
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x14a34" }],
           });
-
-          console.log("✅ Message signed");
-          return signature as `0x${string}`;
-        },
-
-        // Sign transaction
-        async signTransaction(transaction) {
-          console.log("📝 Signing transaction with MetaMask...");
-
-          // MetaMask doesn't support signTransaction directly
-          // This shouldn't be called by X402 exact scheme
-          throw new Error("Use sendTransaction instead of signTransaction");
-        },
-
-        // Sign typed data (EIP-712) - This is what X402 uses for USDC transfers
-        async signTypedData(typedData) {
-          console.log("🔔 signTypedData CALLED - MetaMask should prompt now!");
-          console.log("📝 Requesting EIP-3009 signature from MetaMask...");
-
-          if (!typedData.message) {
-            console.error("❌ typedData.message is undefined:", typedData);
-            throw new Error("typedData.message is undefined");
+        } catch (switchError: any) {
+          // Chain not added, add it
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [
+                {
+                  chainId: "0x14a34",
+                  chainName: "Base Sepolia",
+                  nativeCurrency: {
+                    name: "ETH",
+                    symbol: "ETH",
+                    decimals: 18,
+                  },
+                  rpcUrls: ["https://sepolia.base.org"],
+                  blockExplorerUrls: ["https://sepolia.basescan.org"],
+                },
+              ],
+            });
+          } else {
+            throw switchError;
           }
+        }
+      }
 
-          console.log(
-            "📋 Full typed data structure:",
-            JSON.stringify(typedData, null, 2)
-          );
-          console.log("💳 Payment details:", {
-            from: typedData.message.from,
-            to: typedData.message.to,
-            value: typedData.message.value,
-            amount: `${parseInt(typedData.message.value) / 1_000_000} USDC`,
-          });
+      console.log(`🔑 Wallet connected: ${this.walletAddress}`);
+      console.log("✅ Payment client initialized successfully");
 
-          // MetaMask's eth_signTypedData_v4 method
-          const signature = await window.ethereum.request({
-            method: "eth_signTypedData_v4",
-            params: [
-              address,
-              JSON.stringify({
-                domain: typedData.domain,
-                types: typedData.types,
-                primaryType: typedData.primaryType,
-                message: typedData.message,
-              }),
-            ],
-          });
-
-          console.log("✅ EIP-3009 authorization signed");
-          console.log("   Signature:", signature);
-
-          return signature as `0x${string}`;
-        },
-      };
-
-      // Register EVM payment scheme with MetaMask signer
-      registerExactEvmScheme(this.client, {
-        signer: metamaskSigner as any,
-      });
-
-      // Wrap fetch with automatic payment handling
-      this.fetchWithPayment = wrapFetchWithPayment(fetch, this.client);
-
-      // Create HTTP client for extracting payment receipts
-      this.httpClient = new x402HTTPClient(this.client);
-
-      console.log("✅ X402 client initialized successfully");
-      console.log("   Network: Base Sepolia (84532)");
-      console.log(`   Wallet: ${address}`);
-      console.log("   Ready to make payment-gated requests");
-
-      return address;
+      if (!this.walletAddress) {
+        throw new Error("Wallet address is not available");
+      }
+      return this.walletAddress;
     } catch (error: any) {
-      console.error("❌ Failed to initialize X402 client:", error);
+      console.error("❌ Failed to initialize payment client:", error);
       this.reset();
-      throw new Error(`X402 initialization failed: ${error.message}`);
+      throw new Error(`Initialization failed: ${error.message}`);
     }
   }
 
-  /**
-   * Make a payment-gated HTTP request
-   * Payment is handled automatically by X402
-   */
+  async checkUSDCBalance(
+    address: string,
+    usdcAddress: string
+  ): Promise<bigint> {
+    if (!window.ethereum) {
+      throw new Error("MetaMask not available");
+    }
+
+    try {
+      const data = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [address as `0x${string}`],
+      });
+
+      const result = await window.ethereum.request({
+        method: "eth_call",
+        params: [
+          {
+            to: usdcAddress,
+            data: data,
+          },
+          "latest",
+        ],
+      });
+
+      return BigInt(result);
+    } catch (error) {
+      console.error("Failed to check balance:", error);
+      return BigInt(0);
+    }
+  }
+
   async makePaymentRequest(
     url: string,
     options: RequestInit = {}
   ): Promise<any> {
-    if (!this.fetchWithPayment || !this.httpClient) {
-      throw new Error("X402 client not initialized. Call initialize() first.");
+    if (!this.initialized || !this.walletAddress) {
+      throw new Error("Payment client not initialized");
     }
 
     try {
       console.log("\n💳 Making payment-gated request...");
       console.log(`   URL: ${url}`);
       console.log(`   Method: ${options.method || "GET"}`);
-      console.log("   💡 Checking if payment is required...");
 
-      // Make request with automatic payment handling
-      // X402 will:
-      // 1. Send initial request
-      // 2. Receive 402 with payment requirements
-      // 3. Automatically prompt MetaMask for EIP-3009 signature
-      // 4. Send signed payment authorization in X-Payment header
-      // 5. Server verifies with facilitator and returns content
-      const response = await this.fetchWithPayment(url, {
+      // Step 1: Make initial request to get payment requirements
+      console.log("🔄 Step 1: Checking payment requirements...");
+      const initialResponse = await fetch(url, {
         ...options,
         headers: {
           "Content-Type": "application/json",
@@ -187,163 +170,240 @@ class PaymentClient {
         },
       });
 
-      console.log(`📥 Response status: ${response.status}`);
+      console.log(`   Response status: ${initialResponse.status}`);
 
-      // Check if payment was required and completed
-      const paymentHeader = response.headers.get("x-payment-response");
-      if (paymentHeader) {
-        console.log("✅ Payment was processed");
+      // If not 402, return the response
+      if (initialResponse.status !== 402) {
+        const data = await initialResponse.json();
+        return {
+          data,
+          status: initialResponse.status,
+          headers: Object.fromEntries(initialResponse.headers.entries()),
+          payment: null,
+        };
       }
 
-      // Handle 402 errors (payment failed)
-      if (response.status === 402) {
-        const clonedResponse = response.clone();
-        try {
-          const errorBody = await clonedResponse.json();
-          console.error("❌ Payment required:", errorBody);
-          throw new Error(
-            errorBody.error ||
-              errorBody.message ||
-              "Payment required but not completed"
-          );
-        } catch (e) {
-          throw new Error("Payment required but not completed");
-        }
+      // Step 2: Parse payment requirements
+      console.log("💰 Step 2: Payment required - parsing requirements...");
+      const paymentReqs = await initialResponse.json();
+      console.log("   Payment requirements:", paymentReqs);
+
+      if (!paymentReqs.accepts || paymentReqs.accepts.length === 0) {
+        throw new Error("Invalid payment requirements");
       }
 
-      // Extract payment receipt if payment was made
-      if (response.ok) {
-        try {
-          const paymentResponse = this.httpClient.getPaymentSettleResponse(
-            (name: string) => response.headers.get(name)
-          );
+      const requirement = paymentReqs.accepts[0];
+      const amountInWei = requirement.maxAmountRequired;
+      const amountInUSDC =
+        requirement.extra?.priceUSDC || parseFloat(amountInWei) / 1_000_000;
 
-          if (paymentResponse) {
-            console.log("✅ Payment settled successfully");
-            console.log(`   Transaction: ${paymentResponse.txHash || "N/A"}`);
-            console.log(`   Amount: ${paymentResponse.amount || "N/A"}`);
+      console.log(`   Amount: ${amountInWei} wei (${amountInUSDC} USDC)`);
+      console.log(`   To: ${requirement.payTo}`);
+      console.log(`   Asset: ${requirement.asset}`);
 
-            // Store payment receipt
-            this.paymentReceipts.set(url, {
-              ...paymentResponse,
-              timestamp: new Date().toISOString(),
-              url,
-            });
-          } else {
-            console.log("ℹ️ No payment required for this request");
-          }
-        } catch (receiptError) {
-          console.warn("⚠️ Could not extract payment receipt:", receiptError);
-        }
-      }
+      // Step 3: Check balance first
+      console.log("📝 Step 3: Checking USDC balance...");
+      const balance = await this.checkUSDCBalance(
+        this.walletAddress,
+        requirement.asset
+      );
+      const balanceInUSDC = Number(balance) / 1_000_000;
+      console.log(
+        `   Balance: ${balance.toString()} wei (${balanceInUSDC} USDC)`
+      );
 
-      // Parse response body
-      let data;
-      const contentType = response.headers.get("content-type");
-
-      if (contentType?.includes("application/json")) {
-        data = await response.json();
-      } else {
-        data = await response.text();
-      }
-
-      if (!response.ok) {
+      if (balance < BigInt(amountInWei)) {
         throw new Error(
-          (data as any).message ||
-            (data as any).error ||
-            `Request failed with status ${response.status}`
+          `Insufficient USDC balance. You have ${balanceInUSDC.toFixed(
+            2
+          )} USDC but need ${amountInUSDC} USDC.`
         );
       }
+
+      // Step 4: Send payment using MetaMask
+      console.log("💳 Step 4: Sending USDC payment...");
+      console.log(`   From: ${this.walletAddress}`);
+      console.log(`   To: ${requirement.payTo}`);
+      console.log(`   Amount: ${amountInUSDC} USDC`);
+
+      // Encode transfer function call
+      const transferData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: "transfer",
+        args: [requirement.payTo as `0x${string}`, BigInt(amountInWei)],
+      });
+
+      console.log(
+        "   Encoded transfer data:",
+        transferData.substring(0, 20) + "..."
+      );
+
+      // Send transaction via MetaMask
+      let txHash: string;
+      try {
+        txHash = await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: this.walletAddress,
+              to: requirement.asset, // USDC contract address
+              data: transferData,
+              // Let MetaMask estimate gas
+            },
+          ],
+        });
+      } catch (txError: any) {
+        console.error("Transaction error:", txError);
+
+        if (txError.code === 4001) {
+          throw new Error("Transaction rejected by user");
+        }
+
+        // Try to extract meaningful error
+        if (txError.message?.includes("insufficient")) {
+          throw new Error("Insufficient funds for gas or USDC transfer");
+        }
+
+        throw new Error(
+          `Transaction failed: ${txError.message || "Unknown error"}`
+        );
+      }
+
+      console.log(`✅ Payment transaction sent: ${txHash}`);
+
+      // Step 5: Wait for transaction confirmation
+      console.log("⏳ Step 5: Waiting for confirmation...");
+      await this.waitForTransaction(txHash);
+
+      // Step 6: Create payment header and retry request
+      console.log("🔄 Step 6: Retrying request with payment proof...");
+
+      const paymentHeader = JSON.stringify({
+        txHash: txHash,
+        amount: amountInWei,
+        amountUSDC: amountInUSDC,
+        timestamp: Date.now(),
+        from: this.walletAddress,
+        to: requirement.payTo,
+      });
+
+      const finalResponse = await fetch(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Payment": paymentHeader,
+          ...options.headers,
+        },
+      });
+
+      console.log(`   Final response status: ${finalResponse.status}`);
+
+      if (!finalResponse.ok) {
+        const errorData = await finalResponse.json().catch(() => ({}));
+        throw new Error(
+          errorData.error ||
+            errorData.details ||
+            `Request failed: ${finalResponse.statusText}`
+        );
+      }
+
+      const data = await finalResponse.json();
+      console.log("✅ Payment request completed successfully!");
+
+      // Store receipt
+      const receipt = {
+        txHash: txHash,
+        amount: amountInWei,
+        amountUSDC: amountInUSDC,
+        timestamp: new Date().toISOString(),
+        url,
+        from: this.walletAddress,
+        to: requirement.payTo,
+      };
+      this.paymentReceipts.set(url, receipt);
 
       return {
         data,
-        status: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
-        payment: this.paymentReceipts.get(url) || null,
+        status: finalResponse.status,
+        headers: Object.fromEntries(finalResponse.headers.entries()),
+        payment: receipt,
       };
     } catch (error: any) {
       console.error("❌ Payment request failed:", error);
-
-      // Handle specific MetaMask errors
-      if (error.code === 4001 || error.message?.includes("User denied")) {
-        throw new Error(
-          "Payment rejected: You declined the MetaMask signature request"
-        );
-      } else if (error.message?.includes("insufficient funds")) {
-        throw new Error(
-          "Insufficient USDC balance. Please add USDC to your Base Sepolia wallet."
-        );
-      } else if (error.message?.includes("network")) {
-        throw new Error(
-          "Network error: Please ensure you're connected to Base Sepolia in MetaMask"
-        );
-      }
-
       throw error;
     }
   }
 
-  /**
-   * Get all payment receipts
-   */
+  async waitForTransaction(
+    txHash: string,
+    maxAttempts: number = 30
+  ): Promise<void> {
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const receipt = await window.ethereum.request({
+          method: "eth_getTransactionReceipt",
+          params: [txHash],
+        });
+
+        if (receipt) {
+          if (receipt.status === "0x1") {
+            console.log("   ✅ Transaction confirmed!");
+            return;
+          } else {
+            throw new Error("Transaction failed on-chain");
+          }
+        }
+
+        // Wait 2 seconds before next check
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        console.log(`   Waiting for confirmation... (${i + 1}/${maxAttempts})`);
+      } catch (error) {
+        // Ignore errors and keep waiting
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+
+    // If we get here, just proceed (transaction might still be pending)
+    console.log("   ⚠️ Transaction pending, proceeding anyway...");
+  }
+
   getPaymentHistory(): any[] {
     return Array.from(this.paymentReceipts.values());
   }
 
-  /**
-   * Get specific payment receipt
-   */
   getPaymentReceipt(url: string): any {
     return this.paymentReceipts.get(url);
   }
 
-  /**
-   * Get current wallet address
-   */
   getWalletAddress(): string | null {
     return this.walletAddress;
   }
 
-  /**
-   * Reset the client
-   */
+  async disconnect(): Promise<void> {
+    this.reset();
+    console.log("👋 Wallet disconnected");
+  }
+
   reset(): void {
-    this.client = null;
-    this.fetchWithPayment = null;
-    this.httpClient = null;
     this.walletAddress = null;
+    this.initialized = false;
     this.paymentReceipts.clear();
-    console.log("🔄 X402 client reset");
+    console.log("🔄 Payment client reset");
   }
 }
 
-// Export singleton instance
 export const paymentClient = new PaymentClient();
 
-// Export helper functions
 export async function initializeX402Client(): Promise<string> {
   return paymentClient.initialize();
 }
 
-export async function makePaymentRequest(
-  url: string,
-  options: RequestInit = {}
-): Promise<{ response: Response; paymentReceipt: any }> {
-  const result = await paymentClient.makePaymentRequest(url, options);
-
-  const response = new Response(JSON.stringify(result.data), {
-    status: result.status,
-    headers: result.headers,
-  });
-
-  return {
-    response,
-    paymentReceipt: result.payment,
-  };
-}
-
 export function isX402Initialized(): boolean {
   return paymentClient.isReady();
+}
+
+export async function disconnectX402Client(): Promise<void> {
+  return paymentClient.disconnect();
 }
 
 export function resetX402Client(): void {

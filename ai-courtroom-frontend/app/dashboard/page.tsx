@@ -61,6 +61,7 @@ export default function DashboardPage() {
   }, [address]);
 
   // Initialize x402 client when wallet connects
+  // Initialize x402 client when wallet connects
   useEffect(() => {
     const initX402 = async () => {
       if (!address) return;
@@ -74,9 +75,10 @@ export default function DashboardPage() {
       setError("");
 
       try {
-        await initializeX402Client(address);
+        // No parameter needed - initializeX402Client handles wallet connection
+        await initializeX402Client();
         setX402Ready(true);
-        console.log("✓ x402 client initialized for:", address);
+        console.log("✓ x402 client initialized");
       } catch (err: any) {
         console.error("Failed to initialize x402 client:", err);
         setError("Failed to initialize payment system: " + err.message);

@@ -22,6 +22,7 @@
     "form-data": "^4.0.5",
     "mongoose": "^9.1.1",
     "pinata": "^2.5.2",
+    "thirdweb": "^5.116.1",
     "viem": "^2.43.5"
   },
   "devDependencies": {

@@ -1,10 +1,66 @@
-import { getAddress } from "viem";
+import { createThirdwebClient } from "thirdweb";
+import { facilitator, settlePayment } from "thirdweb/x402";
+import { monadTestnet } from "thirdweb/chains";
+
+if (!process.env.SECRET_KEY) {
+  throw new Error("SECRET_KEY environment variable is not set");
+}
+const client = createThirdwebClient({ 
+  secretKey: process.env.SECRET_KEY
+});
+
+const thirdwebX402Facilitator = facilitator({
+  client,
+  serverWalletAddress: process.env.SERVER_WALLET,
+});
 
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
-const NETWORK = "eip155:84532"; // Base Sepolia chain ID format for X402
 
-// X402 Facilitator endpoint (adjust based on actual facilitator URL)
-const FACILITATOR_URL = "https://x402.org/facilitator";
+/**
+ * Verify and settle payment using Thirdweb X402
+ */
+async function verifyAndSettlePayment(req, config) {
+  try {
+    console.log("🔍 Verifying payment with Thirdweb X402...");
+    
+    const paymentData = req.headers["x-payment"] || 
+                       req.headers["x-x402-payment"] || 
+                       req.headers["payment"];
+
+    if (!paymentData) {
+      return null;
+    }
+
+    const result = await settlePayment({
+      resourceUrl: `${config.baseUrl}${req.path}`,
+      method: req.method,
+      paymentData,
+      network: "eip155:84532",
+      price: config.price,
+      payTo: config.payTo,
+      facilitator: thirdwebX402Facilitator,
+    });
+
+    if (result.status === 200) {
+      console.log("✅ Payment settled on-chain");
+      console.log(`   Transaction: ${result.paymentReceipt.txHash}`);
+      
+      return {
+        verified: true,
+        txHash: result.paymentReceipt.txHash,
+        amount: result.paymentReceipt.balance,
+        from: result.paymentReceipt.from,
+        to: result.paymentReceipt.to,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("❌ Payment verification failed:", error.message);
+    throw error;
+  }
+}
 
 /**
  * Create payment requirements object for 402 response
@@ -12,25 +68,16 @@ const FACILITATOR_URL = "https://x402.org/facilitator";
 function createPaymentRequirements(config) {
   const { price, payTo, resource, description } = config;
 
-  // Convert price string like "$1.00" to base units (USDC has 6 decimals)
-  let maxAmountRequired;
-  if (typeof price === "string" && price.startsWith("$")) {
-    const dollarAmount = parseFloat(price.slice(1));
-    maxAmountRequired = Math.floor(dollarAmount * 1_000_000).toString();
-  } else {
-    maxAmountRequired = price.toString();
-  }
-
   return {
     x402Version: 1,
     accepts: [
       {
         scheme: "exact",
-        network: NETWORK,
-        maxAmountRequired,
+        network: "eip155:84532", // Base Sepolia
+        maxAmountRequired: price,
         resource: resource || "protected-resource",
         description: description || "Payment required for access",
-        payTo: getAddress(payTo),
+        payTo: payTo,
         maxTimeoutSeconds: 300,
         asset: USDC_ADDRESS,
         extra: {
@@ -43,58 +90,10 @@ function createPaymentRequirements(config) {
 }
 
 /**
- * Verify payment with X402 facilitator
- */
-async function verifyPaymentWithFacilitator(paymentHeader, expectedAmount, payTo) {
-  try {
-    console.log("🔍 Verifying payment with facilitator...");
-    
-    const paymentPayload = typeof paymentHeader === "string" 
-      ? JSON.parse(paymentHeader) 
-      : paymentHeader;
-
-    // Send to facilitator for verification and execution
-    const response = await fetch(`${FACILITATOR_URL}/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        payment: paymentPayload,
-        expectedAmount,
-        expectedRecipient: payTo,
-        network: NETWORK,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Facilitator verification failed");
-    }
-
-    const result = await response.json();
-    console.log("✅ Facilitator verified payment:", result.txHash);
-    
-    return {
-      verified: true,
-      txHash: result.txHash,
-      amount: result.amount,
-      from: result.from,
-      to: result.to,
-      timestamp: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error("❌ Facilitator verification failed:", error.message);
-    throw error;
-  }
-}
-
-/**
- * X402 Payment Middleware Factory
+ * X402 Payment Middleware Factory using Thirdweb
  */
 export function requirePayment(config) {
   const paymentRequirements = createPaymentRequirements(config);
-  const expectedAmount = paymentRequirements.accepts[0].maxAmountRequired;
 
   return async function x402PaymentMiddleware(req, res, next) {
     console.log(`\n🔐 X402 Payment Gate: ${req.method} ${req.path}`);
@@ -121,16 +120,21 @@ export function requirePayment(config) {
     console.log(`💳 Payment header received (${paymentHeader.length} chars)`);
 
     try {
-      // Verify payment with facilitator
-      const receipt = await verifyPaymentWithFacilitator(
-        paymentHeader,
-        expectedAmount,
-        config.payTo
-      );
+      // Verify and settle payment with Thirdweb X402
+      const receipt = await verifyAndSettlePayment(req, config);
+
+      if (!receipt) {
+        console.log("⚠️  Payment verification returned no receipt");
+        return res.status(402).json({
+          error: "Payment verification failed",
+          message: "Unable to verify payment",
+          details: "The payment could not be verified or settled on-chain",
+        });
+      }
 
       console.log("✅ Payment verified and settled on-chain");
       console.log(`   Transaction: ${receipt.txHash}`);
-      console.log(`   Amount: ${receipt.amount} (${parseInt(receipt.amount) / 1_000_000} USDC)`);
+      console.log(`   Amount: ${receipt.amount}`);
 
       // Attach payment receipt to request
       req.paymentReceipt = receipt;
@@ -158,10 +162,11 @@ export function requirePayment(config) {
 /**
  * Pre-configured middleware for base prompt ($1.00 USDC)
  */
-export function requireBasePromptPayment(payTo) {
+export function requireBasePromptPayment(payTo, baseUrl) {
   return requirePayment({
     price: "$1.00",
     payTo,
+    baseUrl,
     resource: "base-prompt",
     description: "Initialize AI courtroom session with base prompt",
   });
@@ -170,10 +175,11 @@ export function requireBasePromptPayment(payTo) {
 /**
  * Pre-configured middleware for discussion round ($1.50 USDC)
  */
-export function requireDiscussionPayment(payTo) {
+export function requireDiscussionPayment(payTo, baseUrl) {
   return requirePayment({
     price: "$1.50",
     payTo,
+    baseUrl,
     resource: "discussion-round",
     description: "Continue deliberation with discussion round",
   });
