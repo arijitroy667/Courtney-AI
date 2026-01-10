@@ -18,6 +18,19 @@ const nextConfig = {
     'rimraf',
     'why-is-node-running',
   ],
+  experimental: {
+    optimizePackageImports: ['thirdweb', '@walletconnect/universal-provider'],
+  },
+  // Exclude test files from being processed
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push({
+        'pino': 'commonjs pino',
+        'thread-stream': 'commonjs thread-stream',
+      });
+    }
+    return config;
+  },
 }
 
 export default nextConfig

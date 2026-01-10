@@ -1,0 +1,11 @@
+node_modules/**/test
+node_modules/**/tests
+node_modules/**/*.test.js
+node_modules/**/*.test.ts
+node_modules/**/*.spec.js
+node_modules/**/*.spec.ts
+node_modules/**/*.test.mjs
+node_modules/**/bench.js
+node_modules/**/*.md
+node_modules/**/LICENSE
+node_modules/**/*.sh
