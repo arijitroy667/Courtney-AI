@@ -11,7 +11,7 @@ import {
   calculateBoostFee,
 } from "./functions/fee-calculation.js";
 import { generateZkProofAndStore } from "./utils/ipfs-proof-storage.js";
-import contractRoutes from "./contract/contract-routes.ts";
+import contractRoutes from "./contract/contract-routes.js";
 
 const app = express();
 
@@ -45,7 +45,7 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Payment, X-X402-Payment, Payment"
+    "Content-Type, Authorization, X-Payment, X-X402-Payment, Payment, Access-Control-Expose-Headers"
   );
   res.header("Access-Control-Expose-Headers", "X-Payment-Receipt");
 
@@ -54,6 +54,10 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// JSON parser - MUST come before any routes
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -64,6 +68,10 @@ app.use((req, res, next) => {
       : "missing",
     "content-type": req.headers["content-type"],
   });
+  console.log(
+    "📦 Body:",
+    req.body ? JSON.stringify(req.body).substring(0, 200) : "empty"
+  );
   next();
 });
 
@@ -165,7 +173,7 @@ app.post("/api/base-prompt/:wallet_address", async (req, res) => {
 
     // Payment successful - proceed with API call
     console.log("✅ Payment settled successfully");
-    console.log(`   Transaction: ${result.paymentReceipt?.txHash}`);
+    console.log(`   Transaction: ${result.paymentReceipt}`);
 
     if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({

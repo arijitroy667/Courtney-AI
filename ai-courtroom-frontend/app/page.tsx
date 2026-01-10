@@ -141,6 +141,15 @@ export default function LandingPage() {
             >
               How it Works
             </Link>
+
+            {/* RNG link added to landing navbar */}
+            <Link
+              href="/dashboard/rng"
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+            >
+              RNG
+            </Link>
+
             {address && (
               <Link
                 href="/dashboard"

@@ -56,22 +56,21 @@ async def run_all_agents(prompt: str, collection_name, round_no: int):
         run_gemini(gemini_prompt)
     )
 
+    # Handle both Pydantic models and dict responses
+    def extract_response(response):
+        if isinstance(response, dict):
+            return response
+        else:
+            return {
+                "content": response.content,
+                "confidence_score": response.confidence_score,
+                "reason": response.Reason
+            }
+
     responses = {
-        "gpt": {
-            "content": gpt.content,
-            "confidence_score": gpt.confidence_score,
-            "reason": gpt.Reason
-        },
-        "grok": {
-            "content": grok.content,
-            "confidence_score": grok.confidence_score,
-            "reason": grok.Reason
-        },
-        "gemini": {
-            "content": gemini.content,
-            "confidence_score": gemini.confidence_score,
-            "reason": gemini.Reason
-        }
+        "gpt": extract_response(gpt),
+        "grok": extract_response(grok),
+        "gemini": extract_response(gemini)
     }
 
     # Store this round in ChromaDB
@@ -145,15 +144,29 @@ async def run_final_verdict(prompt: str, confidence_scores: list, confidence_pen
         final_response = await run_gemini(final_verdict_prompt)
     
 
-    return {
-        "content": final_response.content,
-        "confidence_score": final_response.confidence_score,
-        "reason": final_response.Reason,
-        "winner": winner_identity,
-        "scores": {
-            "gpt": agent_scores[0],
-            "grok": agent_scores[1],
-            "gemini": agent_scores[2]
+    # Handle both Pydantic models and dict responses
+    if isinstance(final_response, dict):
+        return {
+            "content": final_response["content"],
+            "confidence_score": final_response["confidence_score"],
+            "reason": final_response["reason"],
+            "winner": winner_identity,
+            "scores": {
+                "gpt": agent_scores[0],
+                "grok": agent_scores[1],
+                "gemini": agent_scores[2]
+            }
         }
-    }
+    else:
+        return {
+            "content": final_response.content,
+            "confidence_score": final_response.confidence_score,
+            "reason": final_response.Reason,
+            "winner": winner_identity,
+            "scores": {
+                "gpt": agent_scores[0],
+                "grok": agent_scores[1],
+                "gemini": agent_scores[2]
+            }
+        }
 

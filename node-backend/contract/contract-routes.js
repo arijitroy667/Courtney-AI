@@ -1,5 +1,5 @@
 import express from "express";
-import RandomnessContractClient from "./contract-client";
+import RandomnessContractClient from "./contract-client.js";
 
 const router = express.Router();
 
@@ -18,11 +18,12 @@ const client = new RandomnessContractClient({
 router.post("/api/contract/add-proof", async (req, res) => {
   try {
     const { proofHash } = req.body;
-    if (!proofHash) return res.status(400).json({ error: "proofHash required" });
+    if (!proofHash)
+      return res.status(400).json({ error: "proofHash required" });
 
     const result = await client.addProofHash(proofHash);
     res.json({ ok: true, txHash: result.txHash });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ error: err.message || String(err) });
   }
 });
@@ -33,7 +34,7 @@ router.post("/api/contract/get-random", async (req, res) => {
   try {
     const result = await client.getRandomNumber();
     res.json({ ok: true, ...result });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ error: err.message || String(err) });
   }
 });

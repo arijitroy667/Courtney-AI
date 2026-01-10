@@ -1,35 +1,40 @@
-"use client"
-import { Scale, Home, History, FileText, Dice1 } from "lucide-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import ConnectWalletButton from "@/components/ConnectWalletButton"
-import { cn } from "@/lib/utils"
+"use client";
+import { Scale, Home, History, FileText, Dice1 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import ConnectWalletButton from "@/components/ConnectWalletButton";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/dashboard/history", label: "History", icon: History },
   { href: "/dashboard/rng", label: "RNG", icon: Dice1 },
-]
+];
 
 export function Navigation() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-8">
           {/* Logo links to landing page */}
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link
+            href="/"
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary shadow-lg shadow-primary/20">
               <Scale className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold tracking-tight">Courtney AI</span>
+            <span className="text-xl font-bold tracking-tight">
+              Courtney AI
+            </span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
             {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
@@ -42,7 +47,7 @@ export function Navigation() {
                   <Icon className="h-4 w-4" />
                   {item.label}
                 </Link>
-              )
+              );
             })}
           </nav>
         </div>
@@ -50,5 +55,5 @@ export function Navigation() {
         <ConnectWalletButton />
       </div>
     </header>
-  )
+  );
 }
