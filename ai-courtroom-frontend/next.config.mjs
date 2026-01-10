@@ -21,6 +21,8 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['thirdweb', '@walletconnect/universal-provider'],
   },
+  // Add empty turbopack config to silence the error
+  turbopack: {},
   // Exclude test files from being processed
   webpack: (config, { isServer }) => {
     if (isServer) {
