@@ -36,7 +36,7 @@ async function verifyAndSettlePayment(req, config) {
       resourceUrl: `${config.baseUrl}${req.path}`,
       method: req.method,
       paymentData,
-      network: "eip155:10143",
+      network: "eip155:10413",
       price: config.price,
       payTo: config.payTo,
       facilitator: thirdwebX402Facilitator,
@@ -74,7 +74,7 @@ function createPaymentRequirements(config) {
     accepts: [
       {
         scheme: "exact",
-        network: "eip155:10143", // Monad
+        network: "eip155:10413", // Monad
         maxAmountRequired: price,
         resource: resource || "protected-resource",
         description: description || "Payment required for access",

@@ -192,7 +192,6 @@ app.post("/api/base-prompt/:wallet_address", async (req, res) => {
       { prompt },
       {
         headers: { "Content-Type": "application/json" },
-        timeout: 30000,
       }
     );
 
@@ -403,7 +402,7 @@ app.listen(PORT, () => {
 ║   GET  /api/reports/:wallet                                    ║
 ║   GET  /health                                                 ║
 ║                                                                ║
-║   Network: Base Sepolia (eip155:84532)                         ║
+║   Network: Monad Testnet (eip155:10413)                         ║
 ║   Recipient: ${payTo}        ║
 ╚════════════════════════════════════════════════════════════════╝
   `);
