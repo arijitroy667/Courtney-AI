@@ -1,6 +1,13 @@
 "use client";
 import { useState } from "react";
-import { Dice1, CreditCard, Check, Copy, Loader2, RefreshCw } from "lucide-react";
+import {
+  Dice1,
+  CreditCard,
+  Check,
+  Copy,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +20,10 @@ export default function RNGPage() {
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [proofHash, setProofHash] = useState("");
-  const FEE = "0.001 ETH";
+  const FEE = "0.001 MON";
+
+  const BACKEND_URL =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4021";
 
   const callGetRandom = async () => {
     setError(null);
@@ -44,7 +54,7 @@ export default function RNGPage() {
     setError(null);
     setLoading(true);
     try {
-      const resp = await fetch("/api/contract/add-proof", {
+      const resp = await fetch(`${BACKEND_URL}/api/contract/add-proof`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ proofHash: proofHash.trim() }),
@@ -73,7 +83,8 @@ export default function RNGPage() {
         <div>
           <h1 className="text-2xl font-bold">On-Chain RNG</h1>
           <p className="text-sm text-muted-foreground">
-            Receive provably random numbers generated on-chain. Cost per request: <strong>{FEE}</strong>
+            Receive provably random numbers generated on-chain. Cost per
+            request: <strong>{FEE}</strong>
           </p>
         </div>
       </div>
@@ -85,7 +96,8 @@ export default function RNGPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              Requests are processed on-chain. The server will submit the transaction and pay the gas/fee.
+              Requests are processed on-chain. The server will submit the
+              transaction and pay the gas/fee.
             </div>
 
             <div className="flex gap-3">
@@ -94,7 +106,11 @@ export default function RNGPage() {
                 onClick={callGetRandom}
                 disabled={loading || !address}
               >
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Dice1 className="mr-2 h-4 w-4" />}
+                {loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Dice1 className="mr-2 h-4 w-4" />
+                )}
                 {loading ? "Processing..." : "Get Random Number"}
               </Button>
 
@@ -122,7 +138,9 @@ export default function RNGPage() {
               <div className="mt-2 p-4 rounded-lg bg-muted/10 border border-border/30">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-xs text-muted-foreground">Random (uint256)</div>
+                    <div className="text-xs text-muted-foreground">
+                      Random (uint256)
+                    </div>
                     <div className="font-mono break-words">{random}</div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -156,7 +174,8 @@ export default function RNGPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              Optionally contribute a proof hash to increase global entropy used by the RNG.
+              Optionally contribute a proof hash to increase global entropy used
+              by the RNG.
             </div>
 
             <Input
@@ -168,7 +187,10 @@ export default function RNGPage() {
             />
 
             <div className="flex gap-3">
-              <Button onClick={callAddProof} disabled={loading || !proofHash.trim()}>
+              <Button
+                onClick={callAddProof}
+                disabled={loading || !proofHash.trim()}
+              >
                 <Check className="mr-2 h-4 w-4" />
                 Add Proof Hash
               </Button>
@@ -178,7 +200,8 @@ export default function RNGPage() {
             </div>
 
             <div className="text-xs text-muted-foreground">
-              Contributions are recorded on-chain and influence future randomness.
+              Contributions are recorded on-chain and influence future
+              randomness.
             </div>
           </CardContent>
         </Card>

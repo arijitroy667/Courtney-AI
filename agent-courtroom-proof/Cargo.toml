@@ -9,3 +9,15 @@ opt-level = 3
 [profile.release]
 debug = 1
 lto = true
+
+# Constrain dependencies to versions compatible with Rust 1.79.0
+[workspace.dependencies]
+icu_collections = "=1.5"
+icu_locale_core = "=1.5"
+icu_normalizer = "=1.5"
+icu_properties = "=1.5"
+icu_provider = "=1.5"
+indexmap = "=2.2"
+rayon = "=1.10"
+rayon-core = "=1.12"
+idna = "=0.5"

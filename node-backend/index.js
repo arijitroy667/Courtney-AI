@@ -12,6 +12,7 @@ import {
 } from "./functions/fee-calculation.js";
 import { generateZkProofAndStore } from "./utils/ipfs-proof-storage.js";
 import contractRoutes from "./contract/contract-routes.js";
+import { addProofHashToContract } from "./contract/contract-client.js";
 
 const app = express();
 
@@ -331,6 +332,17 @@ app.post("/api/verdict/:wallet_address", async (req, res) => {
         verdict_hash: proofResult.verdict_hash,
         method_id: proofResult.method_id,
       };
+
+      // Add proof hash to contract for RNG
+      try {
+        console.log("📝 Adding proof hash to RNG contract...");
+        const txHash = await addProofHashToContract(proofResult.verdict_hash);
+        console.log(`✅ Proof hash added to contract. Tx: ${txHash}`);
+        verdictData.proof.contract_tx = txHash;
+      } catch (contractError) {
+        console.error("Failed to add proof hash to contract:", contractError);
+        verdictData.proof.contract_error = contractError.message;
+      }
     } catch (proofError) {
       console.error("Failed to generate ZK proof:", proofError);
       verdictData.proof_error = proofError.message;

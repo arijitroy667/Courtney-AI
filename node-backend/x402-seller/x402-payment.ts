@@ -5,8 +5,8 @@ import { monadTestnet } from "thirdweb/chains";
 if (!process.env.SECRET_KEY) {
   throw new Error("SECRET_KEY environment variable is not set");
 }
-const client = createThirdwebClient({ 
-  secretKey: process.env.SECRET_KEY
+const client = createThirdwebClient({
+  secretKey: process.env.SECRET_KEY,
 });
 
 const thirdwebX402Facilitator = facilitator({
@@ -14,7 +14,7 @@ const thirdwebX402Facilitator = facilitator({
   serverWalletAddress: process.env.SERVER_WALLET,
 });
 
-const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+const USDC_ADDRESS = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
 
 /**
  * Verify and settle payment using Thirdweb X402
@@ -22,10 +22,11 @@ const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 async function verifyAndSettlePayment(req, config) {
   try {
     console.log("🔍 Verifying payment with Thirdweb X402...");
-    
-    const paymentData = req.headers["x-payment"] || 
-                       req.headers["x-x402-payment"] || 
-                       req.headers["payment"];
+
+    const paymentData =
+      req.headers["x-payment"] ||
+      req.headers["x-x402-payment"] ||
+      req.headers["payment"];
 
     if (!paymentData) {
       return null;
@@ -35,7 +36,7 @@ async function verifyAndSettlePayment(req, config) {
       resourceUrl: `${config.baseUrl}${req.path}`,
       method: req.method,
       paymentData,
-      network: "eip155:84532",
+      network: "eip155:10143",
       price: config.price,
       payTo: config.payTo,
       facilitator: thirdwebX402Facilitator,
@@ -44,7 +45,7 @@ async function verifyAndSettlePayment(req, config) {
     if (result.status === 200) {
       console.log("✅ Payment settled on-chain");
       console.log(`   Transaction: ${result.paymentReceipt.txHash}`);
-      
+
       return {
         verified: true,
         txHash: result.paymentReceipt.txHash,
@@ -73,7 +74,7 @@ function createPaymentRequirements(config) {
     accepts: [
       {
         scheme: "exact",
-        network: "eip155:84532", // Base Sepolia
+        network: "eip155:10143", // Monad
         maxAmountRequired: price,
         resource: resource || "protected-resource",
         description: description || "Payment required for access",
@@ -140,20 +141,24 @@ export function requirePayment(config) {
       req.paymentReceipt = receipt;
 
       // Set payment response headers for client
-      res.set("X-Payment-Receipt", JSON.stringify({
-        txHash: receipt.txHash,
-        amount: receipt.amount,
-        verified: true,
-      }));
+      res.set(
+        "X-Payment-Receipt",
+        JSON.stringify({
+          txHash: receipt.txHash,
+          amount: receipt.amount,
+          verified: true,
+        })
+      );
 
       next();
     } catch (error) {
       console.error("❌ Payment verification failed:", error.message);
-      
+
       return res.status(402).json({
         error: "Payment verification failed",
         message: error.message,
-        details: "The payment signature could not be verified or settled on-chain",
+        details:
+          "The payment signature could not be verified or settled on-chain",
       });
     }
   };

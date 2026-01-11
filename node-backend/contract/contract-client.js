@@ -1,70 +1,65 @@
 import {
-  JsonRpcProvider,
-  Wallet,
-  Contract,
-  Interface,
-  parseEther,
-} from "ethers";
+  createThirdwebClient,
+  getContract,
+  prepareContractCall,
+  sendTransaction,
+} from "thirdweb";
+import { monadTestnet } from "thirdweb/chains";
+import { privateKeyToAccount } from "thirdweb/wallets";
+import "dotenv/config";
 
-const ABI = [
-  "event ProofHashAdded(bytes32 proofHash)",
-  "event RandomnessConsumed(address indexed user, uint256 random)",
-  "function addProofHash(bytes32 proofHash) external",
-  "function getRandomNumber() external payable returns (uint256)",
-];
+const client = createThirdwebClient({
+  secretKey: process.env.SECRET_KEY,
+});
 
-/**
- * @typedef {Object} ClientOptions
- * @property {string} [rpcUrl]
- * @property {string} [privateKey]
- * @property {string} contractAddress
- */
+const contract = getContract({
+  client,
+  chain: monadTestnet,
+  address: process.env.RNG_CONTRACT_ADDRESS || "YOUR_CONTRACT_ADDRESS_HERE",
+});
 
-export class RandomnessContractClient {
-  provider;
-  signer;
-  contract;
-  iface;
+const account = privateKeyToAccount({
+  client,
+  privateKey: process.env.SERVER_PRIVATE_KEY,
+});
 
-  constructor(opts) {
-    const rpc = opts.rpcUrl || process.env.RPC_URL || "http://127.0.0.1:8545";
-    const pk = opts.privateKey || process.env.SERVER_PRIVATE_KEY || "";
-    if (!opts.contractAddress) throw new Error("contractAddress required");
+export async function addProofHashToContract(proofHash) {
+  try {
+    const transaction = prepareContractCall({
+      contract,
+      method: "function addProofHash(bytes32 proofHash)",
+      params: [proofHash],
+    });
 
-    this.provider = new JsonRpcProvider(rpc);
-    this.signer = new Wallet(pk, this.provider);
-    this.contract = new Contract(opts.contractAddress, ABI, this.signer);
-    this.iface = new Interface(ABI);
-  }
+    const { transactionHash } = await sendTransaction({
+      transaction,
+      account,
+    });
 
-  async addProofHash(proofHash) {
-    // Accept either 0x-prefixed or plain hex
-    const hash = proofHash.startsWith("0x") ? proofHash : `0x${proofHash}`;
-    const tx = await this.contract.addProofHash(hash);
-    const receipt = await tx.wait();
-    return { txHash: receipt.hash, receipt };
-  }
-
-  async getRandomNumber() {
-    const fee = parseEther("0.001"); // matches contract FEE
-    const tx = await this.contract.getRandomNumber({ value: fee });
-    const receipt = await tx.wait();
-
-    // Try to decode RandomnessConsumed event from logs
-    const topic = this.iface.getEventTopic("RandomnessConsumed");
-    const log = receipt.logs.find((l) => l.topics[0] === topic);
-    if (log) {
-      const parsed = this.iface.parseLog(log);
-      return {
-        txHash: receipt.hash,
-        random: parsed.args.random.toString(),
-        user: parsed.args.user,
-        receipt,
-      };
-    }
-
-    return { txHash: receipt.hash, receipt };
+    return transactionHash;
+  } catch (error) {
+    console.error("Contract interaction error:", error);
+    throw error;
   }
 }
 
-export default RandomnessContractClient;
+export async function getRandomNumber() {
+  try {
+    const transaction = prepareContractCall({
+      contract,
+      method: "function getRandomNumber() payable returns (uint256)",
+      params: [],
+      value: BigInt(1000000000000000), // 0.001 ETH in wei
+    });
+
+    const { transactionHash } = await sendTransaction({
+      transaction,
+      account,
+    });
+
+    return transactionHash;
+  } catch (error) {
+    console.error("Get random number error:", error);
+    throw error;
+  }
+}
