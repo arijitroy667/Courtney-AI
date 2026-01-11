@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useWallet } from "@/components/wallet_connect";
+import { ethers } from "ethers";
 
 export default function RNGPage() {
   const { address } = useWallet();
@@ -31,10 +32,43 @@ export default function RNGPage() {
     setRandom(null);
     setTxHash(null);
     try {
-      const resp = await fetch("/api/contract/get-random", {
+      // Step 1: Request payment transaction from user's wallet
+      const paymentResp = await fetch(`${BACKEND_URL}/api/payment/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: address,
+          amount: "0.001", // 0.001 MON
+        }),
       });
+
+      if (!paymentResp.ok) {
+        const paymentData = await paymentResp.json();
+        throw new Error(paymentData.error || "Payment request failed");
+      }
+
+      const { serverWallet } = await paymentResp.json();
+
+      // Step 2: Send payment from user wallet
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const tx = await signer.sendTransaction({
+        to: serverWallet,
+        value: ethers.utils.parseEther("0.001"),
+      });
+
+      await tx.wait(); // Wait for payment confirmation
+
+      // Step 3: Call get-random API after successful payment
+      const resp = await fetch(`${BACKEND_URL}/api/contract/get-random`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentTxHash: tx.hash,
+          userAddress: address,
+        }),
+      });
+
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Request failed");
       setRandom(data.random ?? null);

@@ -49,7 +49,7 @@ export async function getRandomNumber() {
       contract,
       method: "function getRandomNumber() payable returns (uint256)",
       params: [],
-      value: BigInt(1000000000000000), // 0.001 ETH in wei
+      value: BigInt(1000000000000000), // 0.001 MON in wei
     });
 
     const { transactionHash } = await sendTransaction({
