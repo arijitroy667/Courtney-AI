@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: agent-courtroom-prover
+    runtime: rust
+    buildCommand: cargo build --release
+    startCommand: ./target/release/host
+    envVars:
+      - key: RISC0_DEV_MODE
+        value: "0"
+    healthCheckPath: /health

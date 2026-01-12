@@ -65,8 +65,15 @@ async fn main() {
         .route("/prove", post(generate_proof))
         .layer(cors);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
-    println!("✅ Prover API listening on http://{}", addr);
+    // Read PORT from environment, default to 3030 for local development
+    let port = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(3030);
+
+    // Bind to 0.0.0.0 so Render can access it
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    println!("✅ Prover API listening on http://0.0.0.0:{}", port);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
