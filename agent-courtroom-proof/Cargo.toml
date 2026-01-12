@@ -21,3 +21,6 @@ indexmap = "=2.2"
 rayon = "=1.10"
 rayon-core = "=1.12"
 idna = "=0.5"
+
+[workspace.package]
+rust-version = "1.83.0"
