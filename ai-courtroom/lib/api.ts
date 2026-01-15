@@ -1,7 +1,7 @@
 import { paymentClient } from "../components/x402-buyer";
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4021";
+  process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export interface AgentResponse {
   content: string;

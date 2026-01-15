@@ -22,10 +22,10 @@ const payTo = getAddress(
 );
 
 // FastAPI backend URL
-const FASTAPI_URL = process.env.FASTAPI_URL || "http://127.0.0.1:8000";
+const FASTAPI_URL = process.env.FASTAPI_URL;
 
 // Base URL for this server
-const BASE_URL = process.env.BASE_URL || "http://localhost:4021";
+const BASE_URL = process.env.BASE_URL;
 
 // Create Thirdweb client
 const client = createThirdwebClient({
@@ -378,6 +378,25 @@ app.delete("/api/session/:wallet_address", async (req, res) => {
     res.json({ success: true, fee_charged: 0 });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete session" });
+  }
+});
+
+app.post("/api/payment/request", async (req, res) => {
+  try {
+    // Validate input
+    const { from, amount } = req.body;
+    if (!from || !amount) {
+      return res.status(400).json({ error: "Missing 'from' or 'amount'" });
+    }
+
+    // Return the server wallet address for payment
+    res.json({
+      serverWallet: payTo,
+      amount,
+    });
+  } catch (error) {
+    console.error("Payment request error:", error);
+    res.status(500).json({ error: "Failed to process payment request" });
   }
 });
 
